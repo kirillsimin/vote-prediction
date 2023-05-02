@@ -6,6 +6,7 @@ import pandas as pd
 def preprocess_function(examples):
     return tokenizer(examples["text"], truncation=True)
 
+# https://huggingface.co/learn/nlp-course/chapter3/3#evaluation
 def compute_metrics(eval_pred):
     predictions, labels = eval_pred
     predictions = [item for sublist in predictions for item in sublist]
