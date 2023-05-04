@@ -25,12 +25,13 @@ class Data:
 
     def get_votes(self):
         """ get votes and description """
-        self.cursor.execute("SELECT lb.bill_id as bill_id, string_agg(lp.people_id::text, ',') as label FROM ls_bill lb join ls_bill_vote lbv on lbv.bill_id=lb.bill_id join ls_bill_vote_detail lbvd on lbv.roll_call_id=lbvd.roll_call_id join ls_people lp on lbvd.people_id=lp.people_id where lbvd.vote_id = 1 group by lb.bill_id;")
+        with open('get_votes.pgsql', 'r') as f:
+            query = f.read()
+        self.cursor.execute(query)
         votes = pd.DataFrame(self.cursor.fetchall())
         votes = votes.rename(columns={0: "bill_id", 1: "people"})
         votes["labels"] = None
         return votes
-
 
     def transpose_votes_to_labels(self, votes, people):
         print(votes)
@@ -44,9 +45,18 @@ class Data:
                 print(str(row[0]) + " not found.")
 
             labels = []
-            ids_voted = row["people"].split(',')
+            ids_voted = [vote.split("/") for vote in row["people"].split(',')]
+            
+            # 1 yea, 2 nay, 3 not voting, 4 absent
             for people_id in people[0]:
-                labels.append(float(1) if str(people_id) in ids_voted else float(0))
+                if [str(people_id), "1"] in ids_voted:
+                    labels.append(float(1))
+                
+                elif [str(people_id), "4"] in ids_voted:
+                    labels.append(float(0))
+
+                else:
+                    labels.append(float(-1))
             
             votes.at[index, "labels"] = labels
             votes.at[index, "text"] = full_text
@@ -63,14 +73,10 @@ class Data:
         # sort by random and split into groups for training
         votes = votes.sample(frac=1)
 
-        grouped = []
-        for g, df in votes.groupby(np.arange(len(votes)) // 1200):
-            grouped.append(df)
-
         data_set = DatasetDict({
-            "train": Dataset.from_pandas(pd.DataFrame(data=grouped[0]).reset_index(drop=True)),
-            "test": Dataset.from_pandas(pd.DataFrame(data=grouped[1]).reset_index(drop=True)),
-            "unsupervised": Dataset.from_pandas(pd.DataFrame(data=grouped[2]).reset_index(drop=True))
+            "train": Dataset.from_pandas(pd.DataFrame(data=votes[:3200]).reset_index(drop=True)),
+            "test": Dataset.from_pandas(pd.DataFrame(data=votes.tail(98)).reset_index(drop=True)),
+            # "unsupervised": Dataset.from_pandas(pd.DataFrame(data=grouped[2]).reset_index(drop=True))
         })
 
         print(data_set)

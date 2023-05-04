@@ -11,7 +11,7 @@ model = BertForSequenceClassification.from_pretrained("./fine_tuned_model")
 with torch.no_grad():
     logits = model(**inputs).logits
 
-predicted_class_ids = torch.arange(0, logits.shape[-1])[torch.sigmoid(logits).squeeze(dim=0) > 0.5]
+predicted_class_ids = torch.arange(0, logits.shape[-1])[torch.sigmoid(logits).squeeze(dim=0) >= 0.5]
 predicted_class_ids = predicted_class_ids.tolist()
 
 for id in predicted_class_ids:
